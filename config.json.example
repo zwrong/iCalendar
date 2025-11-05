@@ -1,0 +1,7 @@
+{
+  "caldav": {
+    "server_url": "https://caldav.icloud.com/",
+    "username": "your_apple_id@icloud.com",
+    "password": "your_app_specific_password"
+  }
+}

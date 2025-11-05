@@ -1,0 +1,27 @@
+[project]
+name = "mcp-ical"
+version = "0.1.0"
+description = "A Model Context Protocol server providing tools for CRUD operations for the mac-os calendar"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["loguru>=0.7.3", "mcp[cli]>=1.2.1", "caldav>=1.15", "requests>=2.31.0", "vobject>=0.9.6"]
+
+[dependency-groups]
+dev = ["pytest>=8.3.4", "pytest-mock>=3.14.0", "pytest-random-order>=1.1.1"]
+
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[tool.pytest]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[project.scripts]
+mcp-ical = "mcp_ical.server:main"
