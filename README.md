@@ -20,7 +20,7 @@ A powerful Model Context Protocol (MCP) server that provides natural language ca
 
 - Python 3.12 or higher
 - An iCloud account
-- An app-specific password for your Apple ID (see [Configuration Guide](#-configuration))
+- An app-specific password for your Apple ID
 
 ## 🚀 Installation
 
