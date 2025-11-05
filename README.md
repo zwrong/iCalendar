@@ -113,7 +113,7 @@ Add to your `claude_desktop_config.json`:
 
 **If you encounter "spawn uv ENOENT" error:**
 
-![spawn uv ENOENT](./README.assets/spawn uv ENOENT.png)
+![spawn uv ENOENT](https://github.com/zwrong/iCalendar/blob/main/README.assets/spawn%20uv%20ENOENT.png?raw=true)
 
 This error occurs when the system cannot find the `uv` command in the PATH. To fix this, specify the full path to your `uv` executable:
 
