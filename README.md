@@ -89,13 +89,6 @@ Start the server in development mode:
 uv run mcp-ical
 ```
 
-### Debug Mode
-
-For debugging and development:
-```bash
-uv run python -m mcp_ical.server
-```
-
 ## Claude Desktop Configuration
 
 Add to your `claude_desktop_config.json`:
@@ -107,7 +100,7 @@ Add to your `claude_desktop_config.json`:
       "command": "uv",
       "args": [
         "--directory",
-        "/ABSOLUTE/PATH/TO/PARENT/FOLDER/mcp-ical",
+        "/ABSOLUTE/PATH/TO/PARENT/FOLDER/iCalendar",
         "run",
         "mcp-ical"
       ]
@@ -116,7 +109,40 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-## 🔧 MCP Tools
+### Troubleshooting
+
+**If you encounter "spawn uv ENOENT" error:**
+
+![spawn uv ENOENT](./README.assets/spawn uv ENOENT.png)
+
+This error occurs when the system cannot find the `uv` command in the PATH. To fix this, specify the full path to your `uv` executable:
+
+```json
+{
+  "mcpServers": {
+    "ical": {
+      "command": "/ABSOLUTE/PATH/TO/uv",
+      "args": [
+        "--directory",
+        "/ABSOLUTE/PATH/TO/PARENT/FOLDER/iCalendar",
+        "run",
+        "mcp-ical"
+      ]
+    }
+  }
+}
+```
+
+Find the path to your `uv` executable by running:
+```bash
+which uv
+# or on Windows:
+where uv
+```
+
+Replace `/ABSOLUTE/PATH/TO/uv` with the actual path returned by the command.
+
+After Configuration of Claude Desktop, restart the  Claude Desktop and use it!
 
 ## 📚 Usage Examples
 
