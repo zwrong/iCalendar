@@ -58,3 +58,20 @@ htmlcov/
 
 # Configuration files with sensitive information
 config_private.json
+
+# Claude and AI Assistant files
+.claude/
+.claudeignore
+.claude/settings.json
+.claude/commands/
+.claude/history/
+.claude/cache/
+.claude/sessions/
+.claude/workspace/
+*.claude
+claude_*.json
+claude_*.md
+CLAUDE.md
+
+# Claude Desktop and MCP configurations (if containing personal data)
+claude_desktop_config.json
