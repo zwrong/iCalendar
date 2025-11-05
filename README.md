@@ -28,7 +28,7 @@ A powerful Model Context Protocol (MCP) server that provides natural language ca
 
 1. **Clone this repository**:
    ```bash
-   git clone https://github.com/your-username/mcp-ical.git
+   git clone https://github.com/zwrong/iCalendar.git
    cd mcp-ical
    ```
 
