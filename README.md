@@ -269,7 +269,7 @@ mcp-ical/
 
 ## 📖 Known Issues and Solutions
 
-### Recent Fixes (v0.2.1)
+### Recent Fixes (v0.1.0)
 
 - **Fixed**: `update_event` and `delete_event` now properly handle URL-encoded event IDs
 - **Fixed**: Event identification now checks both `event.id` and `event.url` attributes
