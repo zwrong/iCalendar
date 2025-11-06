@@ -144,10 +144,10 @@ After Configuration of Claude Desktop, restart the  Claude Desktop and use it!
 User: "Do I have any plans today?"
 
 AI: I'll check your calendar for today
-→ list_events("2025-11-05T00:00:00", "2025-11-05T23:59:59")
+→ list_events("2025-11-06T00:00:00", "2025-11-06T23:59:59")
 ```
 
-![iShot_2025-11-05_21.34.23](./README.assets/iShot_2025-11-05_21.34.23.png)
+![iShot_2025-11-06_13.29.26](./README.assets/iShot_2025-11-06_13.29.26.png)
 
 ### Example 2: Creating an Event
 
