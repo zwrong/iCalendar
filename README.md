@@ -227,7 +227,7 @@ This MCP server works with any MCP-compatible client, including:
 - Claude Code
 - Custom MCP clients
 
-## \🐛 Troubleshooting
+## 🐛 Troubleshooting
 
 ### Authentication Issues
 
