@@ -22,7 +22,7 @@ class ConfigManager:
     """Configuration manager with support for config_private.json and config.json."""
 
     def __init__(self):
-        self.project_root = Path(__file__).parent.parent.parent
+        self.project_root = Path(__file__).parent.parent
         self.private_config_path = self.project_root / "config_private.json"
         self.default_config_path = self.project_root / "config.json"
 

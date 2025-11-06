@@ -37,16 +37,6 @@ A powerful Model Context Protocol (MCP) server that provides natural language ca
    uv sync
    ```
 
-   Or with development dependencies:
-   ```bash
-   uv sync --dev
-   ```
-
-### Option 2: Install with pip (coming soon)
-
-```bash
-pip install mcp-ical
-```
 
 ## ⚙️ Configuration
 
@@ -82,12 +72,14 @@ Edit `config_private.json`:
 
 ## 🏃 Running the Server
 
-### Development Mode
-
-Start the server in development mode:
+Start the server:
 ```bash
 uv run mcp-ical
 ```
+
+![iShot_2025-11-05_22.44.23](./README.assets/iShot_2025-11-05_22.44.23.png)
+
+Do **Not** close the terminal of running the server when you use iCalendar in your MCP client.
 
 ## Claude Desktop Configuration
 
@@ -96,7 +88,7 @@ Add to your `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "ical": {
+    "iCalendar": {
       "command": "uv",
       "args": [
         "--directory",
@@ -146,7 +138,7 @@ After Configuration of Claude Desktop, restart the  Claude Desktop and use it!
 
 ## 📚 Usage Examples
 
-### Example 1: Planning Your Week
+### Example 1: Check your plans
 
 ```
 User: "Do I have any plans today?"
