@@ -1,27 +1,48 @@
+import logging
+import os
 import sys
 from datetime import datetime
-from functools import lru_cache
+from functools import cache
 from textwrap import dedent
 
 from loguru import logger
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp_types import ToolAnnotations
 
 from .ical import CalendarManager
 from .models import CreateEventRequest, UpdateEventRequest
 
-mcp = FastMCP("Calendar")
+ENV_LOG_LEVEL = "MCP_ICAL_LOG_LEVEL"
+ENV_READ_ONLY = "MCP_ICAL_READ_ONLY"
 
-logger.remove()
-logger.add(
-    sys.stderr,
-    format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
-    level="DEBUG",
-)
+LOG_FORMAT = "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}"
+
+
+def configure_logging(level: str | None = None) -> None:
+    """Single place where loguru is configured. Logs go to stderr: stdout carries the MCP stdio protocol."""
+    level = (level or os.environ.get(ENV_LOG_LEVEL) or "INFO").upper()
+    logger.remove()
+    try:
+        logger.add(sys.stderr, format=LOG_FORMAT, level=level)
+    except ValueError:
+        logger.add(sys.stderr, format=LOG_FORMAT, level="INFO")
+        logger.warning(f"Unknown {ENV_LOG_LEVEL}={level!r}, falling back to INFO")
+        level = "INFO"
+
+    # caldav logs its iCalendar fix-ups as warnings that include a diff of the event (title, notes...):
+    # only let them through when debugging.
+    debugging = level in ("TRACE", "DEBUG")
+    logging.getLogger("caldav").setLevel(logging.DEBUG if debugging else logging.ERROR)
+
+
+def is_read_only(environ=None) -> bool:
+    value = (os.environ if environ is None else environ).get(ENV_READ_ONLY, "")
+    return value.strip().lower() in ("1", "true", "yes", "on")
 
 
 # Initialize the CalendarManager on demand in order to only establish CalDAV connection
-# when a calendar tool is invoked instead of on the launch of the Claude Desktop app.
-@lru_cache(maxsize=None)
+# when a calendar tool is invoked instead of when the MCP client starts.
+@cache
 def get_calendar_manager() -> CalendarManager:
     """Get or initialize the calendar manager with proper error handling."""
     try:
@@ -30,24 +51,14 @@ def get_calendar_manager() -> CalendarManager:
         error_msg = dedent("""\
         CalDAV connection failed. Please check your configuration:
 
-        1. Make sure config_private.json exists with proper CalDAV settings
+        1. Set ICLOUD_USERNAME and ICLOUD_PASSWORD (or MCP_ICAL_CONFIG / config_private.json)
         2. Verify your Apple ID and app-specific password are correct
         3. Check your network connection
         4. Ensure iCloud Calendar is enabled for your account
-
-        Configuration example:
-        {
-          "caldav": {
-            "server_url": "https://caldav.icloud.com/",
-            "username": "your_apple_id@icloud.com",
-            "password": "your_app_specific_password"
-          }
-        }
         """)
         raise ValueError(error_msg) from e
 
 
-@mcp.resource("calendars://list")
 def get_calendars() -> str:
     """List all available calendars that can be used with calendar operations."""
     try:
@@ -59,10 +70,9 @@ def get_calendars() -> str:
     except ValueError as e:
         return str(e)
     except Exception as e:
-        return f"Error listing calendars: {str(e)}"
+        return f"Error listing calendars: {e!s}"
 
 
-@mcp.tool()
 async def list_calendars() -> str:
     """List all available calendars."""
     try:
@@ -74,10 +84,9 @@ async def list_calendars() -> str:
         return "Available calendars:\n" + "\n".join(f"- {calendar}" for calendar in calendars)
 
     except Exception as e:
-        return f"Error listing calendars: {str(e)}"
+        return f"Error listing calendars: {e!s}"
 
 
-@mcp.tool()
 async def list_events(start_date: datetime, end_date: datetime, calendar_name: str | None = None) -> str:
     """List calendar events in a date range.
 
@@ -107,7 +116,7 @@ async def list_events(start_date: datetime, end_date: datetime, calendar_name: s
                    f"Tip: Check if events exist in this date range and that you have permissions to access the calendar."
 
         logger.info(f"Successfully found {len(events)} events")
-        return "".join([str(event) for event in events])
+        return "\n".join(str(event) for event in events)
 
     except ValueError as e:
         # Handle known configuration issues
@@ -117,7 +126,7 @@ async def list_events(start_date: datetime, end_date: datetime, calendar_name: s
         return f"Configuration error: {error_msg}"
     except Exception as e:
         logger.error(f"Unexpected error in list_events: {e}")
-        return f"Error listing events: {str(e)}\n" \
+        return f"Error listing events: {e!s}\n" \
                f"This could be due to:\n" \
                f"- Network connectivity issues\n" \
                f"- Calendar access permissions\n" \
@@ -125,7 +134,6 @@ async def list_events(start_date: datetime, end_date: datetime, calendar_name: s
                f"Please check your configuration and try again."
 
 
-@mcp.tool()
 async def create_event(create_event_request: CreateEventRequest) -> str:
     """Create a new calendar event.
 
@@ -162,7 +170,7 @@ async def create_event(create_event_request: CreateEventRequest) -> str:
 
     Note: Both `end_date` and `occurrence_count` should not be set simultaneously; choose one or the other, or leave both unset.
     """
-    logger.info(f"Incoming Create Event Request: {create_event_request}")
+    logger.debug(f"Incoming Create Event Request: {create_event_request}")
     try:
         manager = get_calendar_manager()
 
@@ -173,10 +181,9 @@ async def create_event(create_event_request: CreateEventRequest) -> str:
         return f"Successfully created event: {event.title} (ID: {event.identifier})"
 
     except Exception as e:
-        return f"Error creating event: {str(e)}"
+        return f"Error creating event: {e!s}"
 
 
-@mcp.tool()
 async def update_event(event_id: str, update_event_request: UpdateEventRequest) -> str:
     """Update an existing calendar event.
 
@@ -224,10 +231,9 @@ async def update_event(event_id: str, update_event_request: UpdateEventRequest) 
         return f"Successfully updated event: {event.title}"
 
     except Exception as e:
-        return f"Error updating event: {str(e)}"
+        return f"Error updating event: {e!s}"
 
 
-@mcp.tool()
 async def delete_event(event_id: str) -> str:
     """Delete a calendar event by its identifier.
 
@@ -249,10 +255,9 @@ async def delete_event(event_id: str) -> str:
             return f"Failed to delete event with ID: {event_id}"
 
     except Exception as e:
-        return f"Error deleting event: {str(e)}"
+        return f"Error deleting event: {e!s}"
 
 
-@mcp.tool()
 async def debug_calendar_connection() -> str:
     """Debug calendar connection and provide detailed diagnostic information.
 
@@ -272,7 +277,7 @@ async def debug_calendar_connection() -> str:
 
         debug_info = [
             "=== Calendar Connection Debug ===",
-            f"✓ CalDAV connection successful",
+            "✓ CalDAV connection successful",
             f"✓ Found {len(calendars)} calendars: {', '.join(calendars)}",
             ""
         ]
@@ -294,7 +299,7 @@ async def debug_calendar_connection() -> str:
                     debug_info.append(f"  - {event.title} ({event.start_time.date()})")
 
             except Exception as e:
-                debug_info.append(f"Calendar '{calendar_name}': ERROR - {str(e)}")
+                debug_info.append(f"Calendar '{calendar_name}': ERROR - {e!s}")
 
         debug_info.extend([
             "",
@@ -314,16 +319,40 @@ async def debug_calendar_connection() -> str:
 
     except ValueError as e:
         if "Failed to connect" in str(e) or "CalDAV connection failed" in str(e):
-            return f"✗ CalDAV Connection Failed: {str(e)}\n\nPlease check your config_private.json file and ensure:\n- Server URL is correct (https://caldav.icloud.com/)\n- Apple ID and app-specific password are correct\n- iCloud Calendar is enabled for your account"
-        return f"Configuration error: {str(e)}"
+            return f"✗ CalDAV Connection Failed: {e!s}\n\nPlease check your configuration (ICLOUD_USERNAME / ICLOUD_PASSWORD) and ensure:\n- Server URL is correct (https://caldav.icloud.com/)\n- Apple ID and app-specific password are correct\n- iCloud Calendar is enabled for your account"
+        return f"Configuration error: {e!s}"
     except Exception as e:
         logger.error(f"Debug failed with error: {e}")
-        return f"✗ Debug failed: {str(e)}\n\nThis indicates a serious configuration or connectivity issue."
+        return f"✗ Debug failed: {e!s}\n\nThis indicates a serious configuration or connectivity issue."
+
+
+READ_TOOLS = (list_calendars, list_events, debug_calendar_connection)
+WRITE_TOOLS = (create_event, update_event, delete_event)
+
+
+def create_server(read_only: bool = False) -> MCPServer:
+    """Build the MCP server. In read-only mode the write tools are not registered at all."""
+    server = MCPServer("Calendar")
+    server.resource("calendars://list")(get_calendars)
+
+    for fn in READ_TOOLS:
+        server.add_tool(fn, annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+
+    if read_only:
+        logger.info(f"Read-only mode ({ENV_READ_ONLY}): write tools are not registered")
+    else:
+        server.add_tool(create_event, annotations=ToolAnnotations(destructive_hint=False, open_world_hint=True))
+        server.add_tool(update_event, annotations=ToolAnnotations(destructive_hint=True, open_world_hint=True))
+        server.add_tool(delete_event, annotations=ToolAnnotations(destructive_hint=True, open_world_hint=True))
+
+    return server
 
 
 def main():
+    configure_logging()
+    server = create_server(read_only=is_read_only())
     logger.info("Running mcp-ical server...")
-    mcp.run(transport="stdio")
+    server.run(transport="stdio")
 
 
 if __name__ == "__main__":

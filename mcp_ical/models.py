@@ -1,13 +1,13 @@
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from enum import IntEnum
-from typing import Annotated, Self, Optional
+from typing import Annotated, Self
 
+import vobject
 from caldav import CalendarObjectResource
 from loguru import logger
 from pydantic import BaseModel, BeforeValidator, Field, model_validator
-import vobject
 
 
 class Frequency(IntEnum):
@@ -140,7 +140,7 @@ class Event:
     attendees: list[str] | None = None
     last_modified: FlexibleDateTime | None = None
     recurrence_rule: RecurrenceRule | None = None
-    _raw_event: Optional[CalendarObjectResource] = None  # Store the original CalDAV event
+    _raw_event: CalendarObjectResource | None = None  # Store the original CalDAV event
 
     @classmethod
     def from_caldav_event(cls, caldav_event: CalendarObjectResource) -> "Event":
@@ -161,7 +161,7 @@ class Event:
         if not hasattr(vcal, 'vevent'):
             logger.error(f"Event data has no vevent component. Data type: {type(event_data)}")
             logger.debug(f"Event data content: {str(event_data)[:500]}...")
-            raise ValueError(f"Event data has no vevent component")
+            raise ValueError("Event data has no vevent component")
 
         vevent = vcal.vevent
         logger.debug(f"Successfully extracted vevent for event {event_id}")
@@ -186,16 +186,21 @@ class Event:
         # Check if all-day event
         all_day = False
         if hasattr(vevent, 'dtstart') and vevent.dtstart:
-            all_day = hasattr(vevent.dtstart, 'value_param') and vevent.dtstart.value_param == 'DATE'
+            all_day = not isinstance(vevent.dtstart.value, datetime)
 
         # Process alarms
         alarms = []
         if hasattr(vevent, 'valarm'):
             for alarm in vevent.getChildren():
                 if alarm.name == 'VALARM' and hasattr(alarm, 'trigger') and alarm.trigger:
-                    trigger = str(alarm.trigger.value)
+                    trigger = alarm.trigger.value
+                    # vobject parses relative triggers into a timedelta (-15 min for "-PT15M")
+                    if isinstance(trigger, timedelta):
+                        if trigger <= timedelta(0):
+                            alarms.append(int(-trigger.total_seconds() // 60))
+                        continue
                     # Parse trigger like "-PT15M" (15 minutes before)
-                    match = re.match(r'-PT(\d+)([HM])', trigger)
+                    match = re.match(r'-PT(\d+)([HM])', str(trigger))
                     if match:
                         amount = int(match.group(1))
                         unit = match.group(2)
@@ -232,7 +237,7 @@ class Event:
                 title=title,
                 start_time=start_time,
                 end_time=end_time,
-                calendar_name=caldav_event.parent.name if hasattr(caldav_event, 'parent') and caldav_event.parent else None,
+                calendar_name=caldav_event.parent.get_display_name() if hasattr(caldav_event, 'parent') and caldav_event.parent else None,
                 location=location,
                 notes=notes,
                 url=url,
@@ -266,21 +271,48 @@ class Event:
                 f"Occurrences: {self.recurrence_rule.occurrence_count or 'N/A'}"
             )
 
-        return (
-            f"Event: {self.title},\n"
-            f" - Identifier: {self.identifier},\n"
-            f" - Start Time: {self.start_time},\n"
-            f" - End Time: {self.end_time},\n"
-            f" - Calendar: {self.calendar_name or 'N/A'},\n"
-            f" - Location: {self.location or 'N/A'},\n"
-            f" - Notes: {self.notes or 'N/A'},\n"
-            f" - Alarms (minutes before): {alarms_list},\n"
-            f" - URL: {self.url or 'N/A'},\n"
-            f" - All Day Event?: {self.all_day},\n"
-            f" - Organizer: {self.organizer or 'N/A'},\n"
-            f" - Attendees: {attendees_list},\n"
-            f" - {recurrence_info}\n"
-        )
+        # Empty fields are left out to keep the output short; the identifier is always kept
+        # because update_event and delete_event need it.
+        lines = [
+            f"Event: {self.title}",
+            f" - Identifier: {self.identifier}",
+            f" - Start Time: {_local(self.start_time)}",
+            f" - End Time: {_local(self.end_time)}",
+        ]
+        optional = [
+            ("Calendar", self.calendar_name),
+            ("Location", self.location),
+            ("Notes", self.notes),
+            ("Alarms (minutes before)", alarms_list if self.alarms_minutes_offsets else None),
+            ("URL", self.url),
+            ("All Day Event", "yes" if self.all_day else None),
+            ("Organizer", self.organizer),
+            ("Attendees", attendees_list if self.attendees else None),
+        ]
+        lines += [f" - {label}: {value}" for label, value in optional if value]
+        if self.recurrence_rule:
+            lines.append(f" - {recurrence_info}")
+        return "\n".join(lines) + "\n"
+
+    def sort_key(self) -> float:
+        """Chronological key that works across all-day dates, naive and aware datetimes."""
+        return _to_timestamp(self.start_time)
+
+
+def _local(value):
+    """Show aware datetimes in the machine's timezone (events are stored in UTC or in their own zone)."""
+    if isinstance(value, datetime) and value.tzinfo is not None:
+        return value.astimezone()
+    return value
+
+
+def _to_timestamp(value) -> float:
+    if isinstance(value, datetime):
+        # Naive datetimes are taken as local time, like datetime.timestamp() does
+        return value.timestamp()
+    if isinstance(value, date):
+        return datetime.combine(value, time.min).timestamp()
+    return float("inf")
 
 
 class CreateEventRequest(BaseModel):

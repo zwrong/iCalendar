@@ -1,13 +1,18 @@
 [project]
 name = "mcp-ical"
-version = "0.1.0"
-description = "A Model Context Protocol server providing tools for CRUD operations for the mac-os calendar"
+version = "0.2.0"
+description = "A Model Context Protocol server providing tools for CRUD operations on iCloud calendars via CalDAV"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["loguru>=0.7.3", "mcp[cli]>=1.2.1", "caldav>=1.15", "requests>=2.31.0", "vobject>=0.9.6"]
+dependencies = ["loguru>=0.7.3", "mcp[cli]>=2.3", "caldav>=3.4", "vobject>=0.9.6", "python-dateutil>=2.9"]
 
 [dependency-groups]
-dev = ["pytest>=8.3.4", "pytest-mock>=3.14.0", "pytest-random-order>=1.1.1"]
+dev = ["pytest>=8.3.4", "pytest-mock>=3.14.0", "pytest-random-order>=1.1.1", "ruff>=0.6"]
+
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true
 
 
 [build-system]
@@ -15,13 +20,23 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 
-[tool.pytest]
-pythonpath = ["src"]
+[tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["integration: needs real iCloud credentials (ICLOUD_USERNAME/ICLOUD_PASSWORD)"]
 
 [tool.ruff]
 line-length = 120
 target-version = "py312"
+
+[tool.ruff.lint]
+ignore = [
+    # MCP tool handlers turn any failure into an error string for the client instead of crashing
+    # the stdio server, and event parsing skips unreadable items: broad catches are deliberate.
+    "BLE001",
+    "S110",
+    # Configuration errors are reported as ValueError, which the server layer catches.
+    "TRY004",
+]
 
 [project.scripts]
 mcp-ical = "mcp_ical.server:main"

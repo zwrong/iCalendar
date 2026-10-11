@@ -1,6 +1,4 @@
-import sys
 from datetime import datetime
-from typing import List
 
 from loguru import logger
 
@@ -9,13 +7,6 @@ from .models import (
     CreateEventRequest,
     Event,
     UpdateEventRequest,
-)
-
-logger.remove()
-logger.add(
-    sys.stderr,
-    format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
-    level="DEBUG",
 )
 
 
@@ -36,7 +27,7 @@ class CalendarManager:
         start_time: datetime,
         end_time: datetime,
         calendar_name: str | None = None,
-    ) -> List[Event]:
+    ) -> list[Event]:
         """List all events within a given date range
 
         Args:
@@ -62,7 +53,8 @@ class CalendarManager:
         Returns:
             Event: The created event with identifier
         """
-        logger.info(f"Creating event: {new_event.title}")
+        logger.info("Creating event")
+        logger.debug(f"Creating event: {new_event.title}")
         return self.caldav_manager.create_event(new_event)
 
     def update_event(self, event_id: str, request: UpdateEventRequest) -> Event:
@@ -127,5 +119,3 @@ class CalendarManager:
             list[str]: A list of calendar names
         """
         return self.list_calendar_names()
-
-  
